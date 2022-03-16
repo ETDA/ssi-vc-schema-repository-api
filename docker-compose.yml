@@ -1,0 +1,74 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:5.7.32
+    container_name: vc_schema_api_db
+    restart: always
+    ports:
+      - 3306:3306
+    volumes:
+      - .storage/mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: my_user
+      MYSQL_PASSWORD: my_password
+      MYSQL_ROOT_PASSWORD: my_password
+    command: mysqld --ignore-db-dir=lost+found --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --innodb-buffer-pool-size=1G --max-allowed-packet=1G --wait-timeout=28800
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  validator-api:
+    build:
+      context: validator_api
+      dockerfile: Dockerfile
+    image: ssi-registry.teda.th/ssi/vc-schema-repository-api/validator-api/staging:latest
+    container_name: vc_schema_validator_api
+    restart: always
+    volumes:
+      - .env:/app/.env
+      - ./validator_api/logs:/app/logs
+      - ./validator_api/src:/app/src
+      - ./validator_api/tsconfig.json:/app/tsconfig.json
+    ports:
+      - 8081:8081
+    depends_on:
+      - db
+  api:
+    build:
+      context: api
+      dockerfile: Dockerfile
+    image: ssi-registry.teda.th/ssi/vc-schema-repository-api/staging:latest
+    container_name: vc_schema_api
+    restart: always
+    volumes:
+      - ./api:/app
+      - ./.storage/tmp:/app/tmp
+    ports:
+      - 8080:8080
+    depends_on:
+      - validator-api
+      - db
+
+  migration:
+    build:
+      context: .
+      dockerfile: migrate.Dockerfile
+    image: ssi-registry.teda.th/ssi/vc-schema-repository-api/staging-migrate:latest
+    volumes:
+      - .env:/app/.env
+    depends_on:
+      - db
+
+  seed:
+    build:
+      context: .
+      dockerfile: seed.Dockerfile
+    image: ssi-registry.teda.th/ssi/vc-schema-repository-api/staging-seed:latest
+    volumes:
+      - .env:/app/.env
+    container_name: vc_schema_api_seed
+    depends_on:
+      - db

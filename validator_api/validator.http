@@ -1,0 +1,10 @@
+### Send POST request with json body
+POST http://localhost:8081/schema/validate-schema
+Content-Type: application/json
+
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object"
+  }
+}
